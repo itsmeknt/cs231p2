@@ -66,28 +66,45 @@ function converge = hasConverged()
 converge = false;
 end
 
+% step 2
 function [pi mu sigma] = updateGMM(alpha, kmap, im_data)
 initGlobalVariables;
-pi = zeros(numAlphaValues, k);
-mu = zeros(numColors, numAlphaValues, k);
-sigma = zeros(numColors, numColors, numAlphaValues, k);
+pi = zeros(numAlphaValues, k);                              % pi is [2 x k]
+mu = zeros(numColors, numAlphaValues, k);                   % mu is [3 x 2 x k]
+sigma = zeros(numColors, numColors, numAlphaValues, k);     % sigma is [3 x 3 x 2 x k]
 for i = 1:k
     pixelWithK = kmap==i;
     fgPixelWithK = pixelWithK & alpha==fg_val;
-    bgPixelWithK = pixelWithK(alpha==bg_val);
+    bgPixelWithK = pixelWithK & alpha==bg_val;
     
     pi(fg_idx, i) = sum(fgPixelWithK)/sum(pixelWithK);
     pi(bg_idx, i) = sum(bgPixelWithK)/sum(pixelWithK);
     
-    mu(:, fg_idx, i) = mean(im_data(:, fgPixelWithK));
-    mu(:, bg_idx, i) = mean(im_data(:, bgPixelWithK));
+    mu(:, fg_idx, i) = mean(im_data(:, fgPixelWithK),2);
+    mu(:, bg_idx, i) = mean(im_data(:, bgPixelWithK),2);
     
     mu_fg_i = mu(:, fg_idx, i);
-    sigma(:, fg_idx, i) = (mu_fg_i - mean(mu_fg_i))' * (mu_fg_i - mean(mu-fg-i));
+    sigma(:, :, fg_idx, i) = (mu_fg_i - mean(mu_fg_i)) * (mu_fg_i - mean(mu_fg_i))';
     
     mu_bg_i = mu(:, bg_idx, i);
-    sigma(:, bg_idx, i) = (mu_bg_i - mean(mu_bg_i))' * (mu_bg_i - mean(mu-bg-i));
+    sigma(:, :, bg_idx, i) = (mu_bg_i - mean(mu_bg_i)) * (mu_bg_i - mean(mu_bg_i))';
 end
 end
 
 
+% step 1
+function D = computeD(alpha, kmap, im_data, pi, mu, sigma)       % D is [k x numpixels]
+initGlobalVariables;
+numPixels = length(alpha);
+D = zeros(k, numPixels);
+for pixel = 1:numPixels
+   for c = 1:k
+       alpha_n = alpha(pixel);
+       k_n = kmap(pixel);
+       term1 = -log(pi(alpha_n, k_n);
+       term2 = 0.5*log(det(sigma(:,:,alpha_n, k_n)));
+       
+       D(c, pixel) = +  + 0.5*(
+   end
+end
+end

@@ -58,7 +58,8 @@ while true
      end
      
      % step 1
-     
+     D = computeD(alpha, kmap, im_data, pi, mu, sigma);
+     [~, kmap] = max(D); 
 end
 end
 
@@ -66,11 +67,12 @@ function converge = hasConverged()
 converge = false;
 end
 
+% step 2
 function [pi mu sigma] = updateGMM(alpha, kmap, im_data)
 initGlobalVariables;
-pi = zeros(numAlphaValues, k);
-mu = zeros(numColors, numAlphaValues, k);
-sigma = zeros(numColors, numColors, numAlphaValues, k);
+pi = zeros(numAlphaValues, k);                              % pi is [2 x k]
+mu = zeros(numColors, numAlphaValues, k);                   % mu is [3 x 2 x k]
+sigma = zeros(numColors, numColors, numAlphaValues, k);     % sigma is [3 x 3 x 2 x k]
 for i = 1:k
     pixelWithK = kmap==i;
     fgPixelWithK = pixelWithK & alpha==fg_val;
@@ -91,3 +93,20 @@ end
 end
 
 
+% step 1
+function D = computeD(alpha, kmap, im_data, pi, mu, sigma)       % D is [k x numpixels]
+initGlobalVariables;
+numPixels = length(alpha);
+D = zeros(k, numPixels);
+for p = 1:numPixels
+   for c = 1:k
+       a_n = alpha(p);
+       k_n = kmap(p);
+       term1 = -log(pi(a_n, k_n);
+       term2 = 0.5*log(det(sigma(:,:,a_n, k_n)));
+       firstMoment = im_data(:, p) - mu(:, a_n, k_n);
+       term3 = 0.5*firstMoment'*pinv(sigma(:,:,a_n,k_n))*firstMoment;
+       D(c, pixel) = term1+term2+term3;
+   end
+end
+end
