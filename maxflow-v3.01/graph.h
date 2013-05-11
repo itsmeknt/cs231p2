@@ -501,6 +501,4 @@ template <typename captype, typename tcaptype, typename flowtype>
 	}
 	i->is_marked = 1;
 }
-
-
 #endif
