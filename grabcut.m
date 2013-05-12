@@ -9,12 +9,20 @@ imagesc(im_data);
 
 % a bounding box initialization
 disp('Draw a bounding box to specify the rough location of the foreground');
+
+%{
 set(gca,'Units','pixels');
 ginput(1);
 p1=get(gca,'CurrentPoint');fr=rbbox;p2=get(gca,'CurrentPoint');
 p=round([p1;p2]);
 xmin=min(p(:,1));xmax=max(p(:,1));
 ymin=min(p(:,2));ymax=max(p(:,2));
+%}
+
+xmin = 10;
+xmax = 412;
+ymin = 10;
+ymax = 412;
 [im_height, im_width, channel_num] = size(im_data);
 xmin = max(xmin, 1);
 xmax = min(im_width, xmax);
@@ -32,7 +40,7 @@ end
 disp('grabcut algorithm');
 
 % reshape image
-im_data = reshape(im_data, im_height*im_width, numColors)';     %im_data is [color x vectorized pixel]
+im_data_vectorized = reshape(im_data, im_height*im_width, numColors)';     %im_data is [color x vectorized pixel]
 bbox_vectorized = zeros(im_height, im_width);
 bbox_vectorized(bbox(2):bbox(4), bbox(1):bbox(3)) = 1;
 bbox_vectorized = reshape(bbox_vectorized, im_height*im_width, 1)';     %im_data is [color x vectorized pixel]
@@ -53,20 +61,27 @@ oldPi = pi;
 oldMu = mu;
 oldSigma = sigma;
 
+% compute beta
+randomPixels = im_data_vectorized;
+if (size(im_data_vectorized,2)  > random_pixel_image_max_size)
+    randomPixels = randomPixelSample(im_data_vectorized, random_pixel_image_max_size);
+end
+beta = computeBeta(randomPixels);
+
 % starting step - decides which step we start the initialization process
 startingStep = 1;
 
 converge = false;
 iter = 1;
 skipStep = true;
-beta = 0;
-gamma = 0;
 while true
     iter
+    figure;
+    imshow(reshape(alpha,im_height,im_width));
     
     % step 1
     if (~skipStep || startingStep==updateKidx)
-        k = updateK(im_data, alpha, bbox_vectorized, pi, mu, sigma, startingStep==updateKidx && iter == 1);
+        k = updateK(im_data_vectorized, alpha, bbox_vectorized, pi, mu, sigma, startingStep==updateKidx && iter == 1);
         if (startingStep == updateKidx)
             skipStep = false;
         end
@@ -77,7 +92,7 @@ while true
         oldPi = pi;
         oldMu = mu;
         oldSigma = sigma;
-        [pi mu sigma] = updateGMM(im_data, alpha, k, startingStep==updateGMMidx && iter == 1);
+        [pi mu sigma] = updateGMM(im_data_vectorized, alpha, k, startingStep==updateGMMidx && iter == 1);
         
         if (iter > 1 && hasConverged(pi, mu, sigma, oldPi, oldMu, oldSigma))
             converge = true;
@@ -92,7 +107,7 @@ while true
     
     % step 3
     if (~skipStep || startingStep==updateAlphaIdx)
-        alpha = updateAlpha(k, pi, mu, sigma, gamma, beta, startingStep==updateAlphaIdx && iter == 1);
+        alpha = updateAlpha(im_data, im_data_vectorized, k, alpha, pi, mu, sigma, lambda, beta, startingStep==updateAlphaIdx && iter == 1);
         
         if (startingStep == updateAlphaIdx)
             skipStep = false;
@@ -106,6 +121,49 @@ while true
     skipStep = false;
     iter = iter+1;
 end
+end
+
+function randomPixels = randomPixelSample(im_data_vectorized, n)
+idx = randsample(size(im_data_vectorized,2), n);
+randomPixels = im_data_vectorized(:, idx);
+end
+
+function beta = computeBeta(im_data_vectorized)
+initGlobalVariables;
+disp('computing beta');
+if (allowCache)
+    try
+        load([betaCacheFile]);
+        return;
+    catch
+    end
+end
+
+numPixels = size(im_data_vectorized, 2);
+rep_im_data = repmat(im_data_vectorized, 1, 2);
+
+sumSq = 0;
+term1 = im_data_vectorized;
+for i = 1:numPixels
+    if mod(i,1000) == 0
+        i
+    end
+    term2 = rep_im_data(:, i:i+numPixels-1);
+    
+    truncateLength = i-1;
+    term2 = [zeros(3, truncateLength), term2(:, truncateLength+1:end)];
+    
+    assert(size(term1,1) == size(term2,1));
+    assert(size(term1,2) == size(term2,2));
+    
+    diff = term1-term2;
+    sumSq = sumSq + sum(sum(diff.*diff))
+end
+sumSq = sumSq/numPixels;
+
+beta = 1/(2*sumSq)
+disp('computing beta done!');
+save(betaCacheFile, 'beta');
 end
 
 function converge = hasConverged(pi, mu, sigma, oldPi, oldMu, oldSigma)

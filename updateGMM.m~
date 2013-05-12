@@ -1,21 +1,32 @@
-function [pi mu sigma] = updateGMM(alpha, k, im_data, init)
+function [pi mu sigma] = updateGMM(im_data_vectorized, alpha, k, init)
 disp('step 2: finding theta');
 initGlobalVariables;
-pi = zeros(numAlphaValues, k);                              % pi is [2 x k]
-mu = zeros(numColors, numAlphaValues, k);                   % mu is [3 x 2 x k]
-sigma = zeros(numColors, numColors, numAlphaValues, k);     % sigma is [3 x 3 x 2 x k]
-for i = 1:k
+pi = zeros(numAlphaValues, K);                              % pi is [2 x k]
+mu = zeros(numColors, numAlphaValues, K);                   % mu is [3 x 2 x k]
+sigma = zeros(numColors, numColors, numAlphaValues, K);     % sigma is [3 x 3 x 2 x k]
+for i = 1:K
     idx_k_i = k == i;
-    idx = alpha==fg_val;
-    pixelFg_iIdx = pixelFgIdx & idx_k_i;
-    pixelBgIdx = alpha==bg_val;
-    pixelBg_iIdx= pixelBgIdx & idx_k_i;
+    idx_fg = alpha==fg_val;
+    idx_fg_i = idx_fg & idx_k_i;
+    idx_bg = alpha==bg_val;
+    idx_bg_i= idx_bg & idx_k_i;
     
-    pi(fg_idx, i) = sum(pixelFg_iIdx)/sum(pixelFgIdx);
-    pi(bg_idx, i) = sum(pixelBg_iIdx)/sum(pixelBgIdx);
+    numPixelFg_i = sum(idx_fg_i);
+    numPixelFg = sum(idx_fg);
+    pi(fg_idx, i) = numPixelFg_i/numPixelFg;
+    if (numPixelFg_i == 0 || numPixelFg == 0 || abs(pi(fg_idx, i)) < epsilon)
+        pi(fg_idx, 1) = epsilon;
+    end
     
-    im_data_fg_i = im_data(:, pixelFg_iIdx);
-    im_data_bg_i = im_data(:, pixelBg_iIdx);
+    numPixelBg_i = sum(idx_bg_i);
+    numPixelBg = sum(idx_bg);
+    pi(bg_idx, i) = numPixelBg_i/numPixelBg;
+    if (numPixelBg_i == 0 || numPixelBg == 0 || abs(pi(bg_idx, i)) < epsilon)
+        pi(bg_idx, 1) = epsilon;
+    end
+    
+    im_data_fg_i = im_data_vectorized(:, idx_fg_i);
+    im_data_bg_i = im_data_vectorized(:, idx_bg_i);
     mu(:, fg_idx, i) = mean(im_data_fg_i,2);
     mu(:, bg_idx, i) = mean(im_data_bg_i,2);
     
