@@ -60,6 +60,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     */
 
         typedef Energy<int,int,int> EnergyType;
+        
+  /*
   
   		// Minimize the following function of 3 binary variables:
 		// E(x, y, z) = x - 2*y + 3*(1-z) - 4*x*y + 5*|y-z|
@@ -87,8 +89,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		printf("z = %d\n", e->get_var(varz));
 
 		delete e;
-        
-  /*
+        */
+  
   int label [1];
   int N = 1;
   
@@ -98,28 +100,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     EnergyType::Var a;
     std::vector<EnergyType::Var> vars(N);
 
-    EnergyType e;
+    EnergyType *e = new EnergyType(1,1,NULL);
 
     // add a node
-    vars[i] = e.add_variable();
+    vars[i] = e->add_variable();
 
     // add the unary term for a node
-    e.add_term1(vars[i], 1, 1);
+    e->add_term1(vars[i], 1, 1);
 
     // add the pairwise term for an edge
-    e.add_term2(vars[i], vars[i], 1, 1, 1, 1);
+    e->add_term2(vars[i], vars[i], 1, 1, 1, 1);
 
     // perform energy minimization
-    EnergyType::TotalValue mnE = e.minimize();
+    EnergyType::TotalValue mnE = e->minimize();
 
     // get new labels
-    if (e.get_var(vars[i]))
+    if (e->get_var(vars[i]))
       label[i] = 1;
     else
       label[i] = 0;
   }
   
-  */
+  
 
 
 //declare variables

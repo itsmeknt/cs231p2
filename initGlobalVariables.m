@@ -1,5 +1,10 @@
+kCacheFile = 'cache/kmap';
+updateKidx = 1;
+updateGMMidx = 2;
+updateAlphaIdx = 3;
+
 % init variables
-k = 5;
+K = 5;
 numAlphaValues = 2;
 numColors = 3;
 fg_idx = 1;
