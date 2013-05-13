@@ -54,15 +54,5 @@ for i = 1:K
 end
 disp('step 2 done!');
 
-% plot
-figure;
-redFgMu = mu(1,1,:);
-greenFgMu = mu(2,1,:);
-redBgMu = mu(1,2,:);
-greenBgMu = mu(2,2,:);
-figure(1);
-scatter(redFgMu, greenFgMu, 'r');
-hold on;
-scatter(redBgMu, greenBgMu, 'b');
 
 end

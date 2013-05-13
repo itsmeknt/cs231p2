@@ -1,16 +1,38 @@
-function [alpha] = updateAlpha(im_data, im_data_vectorized, k, alpha, pi, mu, sigma, gamma, beta, init)
+function [alpha] = updateAlpha(im_data, im_data_vectorized, k, alpha, pi, mu, sigma, gamma, beta, init,bbox_vectorized)
+initGlobalVariables;
 disp('step 3: finding alpha');
-D = computeD(im_data_vectorized, k, pi, mu, sigma);
+D = computeD(im_data_vectorized, k, pi, mu, sigma,alpha);
+% Dsliced = D(fg_idx,:).*(alpha==fg_val) + D(bg_idx,:).*(alpha==bg_val);
+%tU = find(bbox_vectorized==1);
+%D = D(:,tU);
+% Dsliced = Dsliced(:,tU);
+% alpha_fg_idx=alpha==fg_val;
+% alpha_bg_idx=alpha==bg_val;
+% D(1,:)=D(1,:).*alpha_fg_idx;
+% D(2,:)=D(2,:).*alpha_bg_idx;
 V = computeV(im_data, alpha, beta, gamma);
-alpha = minCut(abs(D), abs(V));
+%V = V(:,tU,:);
+numPixels=size(im_data_vectorized,2);
+maxV = max(sum(V(:,:,1)));
+%alphatU = minCut(D, V, tU, numPixels, maxV+1);
+%alpha(tU) = alphatU;
+newAlpha = segment_full(D, V);
+bbox_vectorized_idx = find(bbox_vectorized==1);
+alpha(bbox_vectorized_idx) = newAlpha(bbox_vectorized_idx);
 disp('step 3 done!');
 end
 
+% function D=computeD(im_data_vectorized, alpha, k, pi, mu, sigma)
+% 
+% initGlobalVariables;
+% 
 
-function D = computeD(im_data_vectorized, k, pi, mu, sigma)       % D is [numAlpha x numpixels]
+function D = computeD(im_data_vectorized, k, pi, mu, sigma,alpha)       % D is [numAlpha x numpixels]
 initGlobalVariables;
 numPixels = length(k);
 D = zeros(numAlphaValues, numPixels);
+alpha_fg_idx=alpha==fg_val;
+alpha_bg_idx=alpha==bg_val;
 
 % cache computations
 term1cache = -log(pi);                                         % a x K

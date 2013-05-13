@@ -857,10 +857,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 	//printf("1\n");
 //declare variables
-    mxArray *D, *PairW, *alpha;
-    const mwSize *dimsPairW, *dimsD;
-    double *alphaPtr, *DPtr, *PairWPtr;
-    int dimxPairW, dimyPairW, dimzPairW, dimxD, dimyD;
+    mxArray *D, *PairW, *tU, *numPixels, *alpha, *Kin;
+    const mwSize *dimsPairW, *dimsD, *dimsTu;
+    double *alphaPtr, *DPtr, *PairWPtr, *tUPtr, *numPixelsPtr, *KPtr;
+    int dimxPairW, dimyPairW, dimzPairW, dimxD, dimyD, dimxTu, dimyTu;
     int i,j;
 
 //associate inputs
@@ -868,7 +868,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	//printf("2\n");
     D = mxDuplicateArray(prhs[0]);
     PairW = mxDuplicateArray(prhs[1]);
-
+    tU = mxDuplicateArray(prhs[2]);
+    numPixels = mxDuplicateArray(prhs[3]);
+    Kin = mxDuplicateArray(prhs[4]); 
 //figure out dimensions
     
 	//printf("3\n");
@@ -886,63 +888,61 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 //associate pointers
     alphaPtr = mxGetPr(alpha);
     DPtr = mxGetPr(D);
+    tUPtr = mxGetPr(tU);
     PairWPtr = mxGetPr(PairW);
-
-	//printf("6\n");
-    typedef Graph<double,double,double> GraphType;
-	int numNodes=dimxPairW;
-	GraphType *g = new GraphType(/*estimated # of nodes*/ numNodes, /*estimated # of edges*/ numNodes*10); 
-	g->add_node(numNodes);
-    // loop through pixels
+    numPixelsPtr = mxGetPr(numPixels);
+    KPtr = mxGetPr(Kin);
+    double K = (double)KPtr[0];
     
     /*
-        for(i=0;i<dimxPairW;i++)
-    {
-            //mexPrintf("D[0][%d] = %f\n",i,DPtr[i*2]);
-            //mexPrintf("D[1][%d] = %f\n",i,DPtr[i*2+1]);
-        for(j=0;j<dimyPairW;j++)
-        {
-            int xy = j+i*dimyPairW;
-            int matSize = dimxPairW*dimyPairW;
-            
-            //mexPrintf("V[%d][%d][0] = %f\n",j,i,PairWPtr[xy]);
-            mexPrintf("V[%d][%d][1] = %f\n",j,i,PairWPtr[matSize + xy - 1]);
-        }
-    }
-    */
+    dimsTu = mxGetDimensions(prhs[2]);
+    dimyTu = (int)dimsTu[0];
+    dimxTu = (int)dimsTu[1];
+	printf("6 dimxTu=%d, dimyTu=%d\n", dimxTu, dimyTu);
+     */
+    typedef Graph<double,double,double> GraphType;
+    int numNodes=(int)numPixelsPtr[0];
+	GraphType *g = new GraphType(/*estimated # of nodes*/ numNodes, /*estimated # of edges*/ 10*numNodes); 
+	g->add_node(numNodes);
     
     for (i=0;i<dimxPairW;i++)
     {
-
-        //if (i % 10000 == 0)
-	//printf("7: %d/%d\n", i, dimxPairW);
-        g->add_tweights(i,DPtr[2*i+1],DPtr[2*i]);
+        /*
+        int currTU = (int)tUPtr[i]-1;
+        int currAlpha = (int)alphaInPtr[currTU];
+        if (currAlpha == 0)
+            g->add_tweights(currTU,DPtr[currTU],0);
+        else if (currAlpha == 1)
+            g->add_tweights(currTU,0,DPtr[currTU]);
+        else {
+            printf("ERROR: currAlpha=%d\n", currAlpha);
+            break;
+        } */
+        // printf("7: i=%d, p=%d\n", i, (int)tUPtr[i]-1);
+        int curr_tU = (int)tUPtr[i]-1;
+        g->add_tweights(curr_tU,DPtr[2*i+1],DPtr[2*i]);
         for (j=0;j<dimyPairW;j++)
         {
             int xy = j+i*dimyPairW;
             int matSize = dimxPairW*dimyPairW;
-            
-	//printf("8: %d/%d\n", j, dimyPairW);
-            if (PairWPtr[xy]==0) {
-	//printf("8-2\n");
-        continue;
-            }
+            if (PairWPtr[xy]==0) continue;
             else {
-	//printf("8-3: dimyPairW=%d, dimxPairW=%d, dimzPairW=%d, dimxD=%d, dimyD=%d, matSize=%d, xy=%d ---- ", dimyPairW, dimxPairW, dimzPairW, dimxD, dimyD, matSize, xy);
-	//printf("8-3-2: PairWPtr1=%f, PairWPtr2=%f\n", PairWPtr[matSize + xy - 1], PairWPtr[xy]);
-    g->add_edge(i,(int)PairWPtr[matSize + xy - 1],PairWPtr[xy],PairWPtr[xy]);
+                //printf("8: j=%d, p1=%d p2=%d\n", j, (int)tUPtr[i]-1,(int)PairWPtr[matSize + xy]-1);
+                g->add_edge(curr_tU,(int)PairWPtr[matSize + xy]-1,PairWPtr[xy],PairWPtr[xy]);
             }
         }
     }
     double flow = g->maxflow();
 	printf("Flow = %f\n", flow);
-	//printf("9\n");
     for (i=0;i<dimxPairW;i++)
 	{
-        if (i % 1000 == 0)
-	//printf("10: %d/%d\n", i, dimxPairW);
-		if (g->what_segment(i) == GraphType::SOURCE) alphaPtr[i]=1;
-		else alphaPtr[i]=0;      
+        //printf("9\n");
+        
+		if (g->what_segment(i) == GraphType::SOURCE) alphaPtr[i]=0;
+        else if (g->what_segment(i) == GraphType::SINK) alphaPtr[i] = 1;
+		else {
+            printf("ERROR: g->what_segment(i) is neither source nor sink\n");
+        }
     }
 	delete g;
     return;

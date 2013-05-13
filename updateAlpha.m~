@@ -1,55 +1,108 @@
-function [alpha] = updateAlpha(k, pi, mu, alph, gamma, beta, init)
+function [alpha] = updateAlpha(im_data, im_data_vectorized, k, alpha, pi, mu, sigma, gamma, beta, init,bbox_vectorized)
+initGlobalVariables;
 disp('step 3: finding alpha');
-alpha = zeros(1, length(k));
+D = computeD(im_data_vectorized, k, pi, mu, sigma,alpha);
+tU = find(bbox_vectorized==1);
+D = D(:,tU);
+% alpha_fg_idx=alpha==fg_val;
+% alpha_bg_idx=alpha==bg_val;
+% D(1,:)=D(1,:).*alpha_fg_idx;
+% D(2,:)=D(2,:).*alpha_bg_idx;
+V = computeV(im_data, alpha, beta, gamma);
+V = V(:,tU,:);
+numPixels=size(im_data_vectorized,2);
+
+alphatU = minCut(D, V, tU, numPixels);
+alpha(tU) = alphatU;
 disp('step 3 done!');
 end
 
+% function D=computeD(im_data_vectorized, alpha, k, pi, mu, sigma)
+% 
+% initGlobalVariables;
+% 
 
-function D = computeD(im_data, k, pi, mu, sigma)       % D is [numAlpha x numpixels]
+function D = computeD(im_data_vectorized, k, pi, mu, sigma,alpha)       % D is [numAlpha x numpixels]
 initGlobalVariables;
 numPixels = length(k);
 D = zeros(numAlphaValues, numPixels);
+alpha_fg_idx=alpha==fg_val;
+alpha_bg_idx=alpha==bg_val;
 
 % cache computations
 term1cache = -log(pi);                                         % a x K
-term2cache = zeros(numAlphaValues, K);                         % a x K
-sigmaInvCache = zeros(numColors, numColors, numAlphaValues, K);      % 3 x 3 x a x K
-for i=1:K
-    term2cache(fg_idx, i) = 0.5*log(det(sigma(:,:,fg_idx, i)));
-    term2cache(bg_idx, i) = 0.5*log(det(sigma(:,:,bg_idx, i)));
-    
-    sigmaInvCache(:, :, fg_idx, i) = pinv(sigma(:,:,fg_idx,i));
-    sigmaInvCache(:, :, bg_idx, i) = pinv(sigma(:,:,bg_idx,i));
-end
 
-
-aa = tic;
+start = tic;
 for a = 1:numAlphaValues
+    term1 = zeros(1, numPixels);
+    term2 = zeros(1, numPixels);
+    term3 = zeros(1, numPixels);
+    
     for c = 1:K
-    term1 = term1cache(fg_idx,c)*(alpha==fg_val) + term1cache(bg_idx,c)*(alpha==bg_val);    % 1 x pixel
-    term2 = term2cache(fg_idx,c)*(alpha==fg_val) + term2cache(bg_idx,c)*(alpha==bg_val);    % 1 x pixel
-    
-    muForAllPixel = bsxfun(@times, mu(:,fg_idx,c), alpha==fg_val) + bsxfun(@times, mu(:,bg_idx,c), alpha==bg_val);    % 3 x pixel
-    firstMoment = im_data - muForAllPixel;                                          % 3 x pixel
-    
-    term3fgHalf = firstMoment'*sigmaInvCache(:,:,fg_idx,c);                          % pixel x 3
-    term3fg = 0.5*sum(term3fgHalf' .* firstMoment);
-    %{
-    term3fg = zeros(1, numPixels);
-    for i=1:numPixels
-        term3fg(i) = term3fgHalf(i,:) * firstMoment(:,i);
+        k_idx = k==c;
+        term1 = term1 + term1cache(a,c)*k_idx;    % 1 x pixel
+        
+        term2logDet = 0.5*log(det(sigma(:,:,a, c)));
+        term2 = term2 + term2logDet*k_idx;    % 1 x pixel
+        
+        muForAllPixels = bsxfun(@times, mu(:,a,c), k_idx);    % 3 x pixel
+        firstMoment = bsxfun(@times, im_data_vectorized - muForAllPixels, k_idx) ;                                          % 3 x pixel
+        sigmaInv = pinv(sigma(:,:,a,c));
+        term3half = (firstMoment'*sigmaInv)';                          % 3 x pixel
+        term3 = term3 + 0.5*sum(term3half .* firstMoment);
     end
-    %}
-    term3bgHalf = firstMoment'*sigmaInvCache(:,:,bg_idx,c);                          % pixel x 3
-    term3bg = 0.5*sum(term3bgHalf' .* firstMoment);
-    %{
-    term3bg = zeros(1, numPixels);
-    for i=1:numPixels
-        term3bg(i) = term3bgHalf(i,:) * firstMoment(:,i);
-    end
-    %}
-    term3 =  term3fg.*(alpha==fg_val) + term3bg.*(alpha==bg_val);                               % 1 x pixel
-    D(c, :) = term1+term2+term3;
+    D(a, :) = term1+term2+term3;
 end
-bb = toc(aa)
+computeDinComputeAlpha_time = toc(start)
 end
+
+function V = computeV(im_data, alpha, beta, gamma)       % V is [numV x numpixels x 2]
+start = tic;
+initGlobalVariables;
+V = zeros(Vdim, size(im_data,1)*size(im_data,2), 2); 
+for i = 1:length(Voffsets)
+    offset = Voffsets(i, :);
+    V(i,:,:) = computeVrow(im_data, alpha, beta, gamma, offset);
+end
+
+computeV = toc(start)
+end
+
+function Vrow = computeVrow(im_data, alpha, beta, gamma, offset)
+initGlobalVariables;
+w = size(im_data, 2);
+h = size(im_data, 1);
+im_data_offset = offsetMatrix(im_data, offset, inf);                % pixels out of boundary will be infinity, so V at that entry will be 0
+alphaMatrix = reshape(alpha, h, w);
+alphaMatrixOffset = offsetMatrix(alphaMatrix, offset, NaN);         % pixels out of boundary will be NaN so equality test always fail
+im_idx = reshape(1:h*w, h, w);
+im_idx_offset = offsetMatrix(im_idx, offset, -1);                   % pixels out of boundary will be -1
+
+diff = im_data - im_data_offset;
+dist = sum(diff.*diff, 3);
+
+alphaDiffIdx = alphaMatrix ~= alphaMatrixOffset;
+Vmatrix = alphaDiffIdx.*exp(-beta*dist);
+Vrow1 = reshape(Vmatrix, 1, h*w);
+
+Vrow = zeros(1, h*w, 2);
+Vrow(:,:,1) = gamma*Vrow1;
+Vrow(:,:,2) = reshape(im_idx_offset, 1, h*w);
+end
+
+function matrixOffset = offsetMatrix(matrix, offset, outOfBoundaryValue)        % offset should be [yoffset, xoffset] integers
+offset_y_dist = abs(offset(1));
+offset_x_dist = abs(offset(2));
+
+matrixOffset = outOfBoundaryValue*ones(size(matrix,1),size(matrix,2), size(matrix,3));
+if offset(1) >=0 && offset(2) >= 0
+    matrixOffset(offset_y_dist+1:end, offset_x_dist+1:end, :) = matrix(1:end-offset_y_dist, 1:end-offset_x_dist, :);
+elseif offset(1) < 0 && offset(2) >= 0
+    matrixOffset(1:end-offset_y_dist, offset_x_dist+1:end, :) = matrix(offset_y_dist+1:end, 1:end-offset_x_dist, :);
+elseif offset(1) >= 0 && offset(2) < 0
+    matrixOffset(offset_y_dist+1:end, 1:end-offset_x_dist, :) = matrix(1:end-offset_y_dist, offset_x_dist+1:end, :);
+elseif offset(1) < 0 && offset(2) < 0
+    matrixOffset(1:end-offset_y_dist, 1:end-offset_x_dist, :) = matrix(offset_y_dist+1:end, offset_x_dist+1:end, :);
+end
+end
+
