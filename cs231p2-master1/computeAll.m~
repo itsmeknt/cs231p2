@@ -1,0 +1,5 @@
+allImages = ['banana1.bmp'; 'banana2.bmp'; 'banana3.bmp'; 'book.bmp'; 'bool.jpg'; 'bush.jpg'; 'ceramic.bmp'; '
+
+start = tic;
+grabcut('banana1.bmp');
+time = toc(start)
