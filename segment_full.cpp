@@ -932,7 +932,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             int matSize = dimxPairW*dimyPairW;
             
 	// printf("8: %d/%d\n", j, dimyPairW);
-            if ((int)PairWPtr[matSize + xy]-1<0) {
+            if ((int)PairWPtr[matSize + xy]-1<=0) {
 	//printf("8-2\n");
         continue;
             }

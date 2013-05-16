@@ -1,4 +1,4 @@
-function alpha = grabcut(im_name)
+function [alphaMatrix kMatrix_fg kMatrix_bg] = grabcut(im_name)
 
 initGlobalVariables;
 % convert the pixel values to [0,1] for each R G B channel.
@@ -13,32 +13,41 @@ end
 true_seg_data = double(imread([seg_dir '/' seg_name]))/255;
 true_seg_data_vectorized = true_seg_data(:)';
 assert(sum(true_seg_data_vectorized == 1) > 0);
+figure;
 % display the image
 imagesc(im_data);
 
 bbox_type = 'true';
 
-if (bbox_type == 'select')
-% select own bbox
-% start
-%
-disp('Draw a bounding box to specify the rough location of the foreground');
-
-set(gca,'Units','pixels');
-ginput(1);
-p1=get(gca,'CurrentPoint');fr=rbbox;p2=get(gca,'CurrentPoint');
-p=round([p1;p2]);
-xmin=min(p(:,1));xmax=max(p(:,1));
-ymin=min(p(:,2));ymax=max(p(:,2));
- 
-%{
-xmin = max(xmin, 1);
-xmax = min(im_width, xmax);
-ymin = max(ymin, 1);
-ymax = min(im_height, ymax);
-%}
-
-bbox = [xmin ymin xmax ymax];
+if (strcmp(bbox_type, 'select'))
+    disp('Draw a bounding box to specify the rough location of the foreground');
+    
+    set(gca,'Units','pixels');
+    ginput(1);
+    p1=get(gca,'CurrentPoint');fr=rbbox;p2=get(gca,'CurrentPoint');
+    p=round([p1;p2]);
+    xmin=min(p(:,1));xmax=max(p(:,1));
+    ymin=min(p(:,2));ymax=max(p(:,2));
+    
+    xmin = max(xmin, 1);
+    xmax = min(im_width, xmax);
+    ymin = max(ymin, 1);
+    ymax = min(im_height, ymax);
+    
+    bbox = [xmin ymin xmax ymax];
+elseif (strcmp(bbox_type, 'true'))
+    bbox = getBbox(im_name);
+    xmin = bbox(1);
+    ymin = bbox(2);
+    xmax = bbox(3);
+    ymax = bbox(4);
+elseif (strcmp(bbox_type, 'all'))
+    xmin = 1;
+    xmax = im_width;
+    ymin = 1;
+    ymax = im_height;
+    bbox = [xmin, ymin, xmax, ymax];
+end
 
 if channel_num ~= 3
     disp('This image does not have all the RGB channels, you do not need to work on it.');
@@ -50,11 +59,6 @@ end
 % use given bbox
 % start
 %
-bbox = getBbox(im_name);
-xmin = bbox(1);
-ymin = bbox(2);
-xmax = bbox(3);
-ymax = bbox(4);
 %
 % end
 
@@ -91,13 +95,13 @@ alpha = reshape(alpha, im_height*im_width, 1)';
 k_fg = zeros(1, length(alpha));
 k_bg = zeros(1, length(alpha));
 
-pi_fg = zeros(numAlphaValues, numK_fg);
-mu_fg = zeros(numColors, numAlphaValues, numK_fg);
-sigma_fg = zeros(numColors, numColors, numAlphaValues, numK_fg);
+pi_fg = zeros(1, numK_fg);
+mu_fg = zeros(numColors,  numK_fg);
+sigma_fg = zeros(numColors, numColors, numK_fg);
 
-pi_bg = zeros(numAlphaValues, numK_bg);
-mu_bg = zeros(numColors, numAlphaValues, numK_bg);
-sigma_bg = zeros(numColors, numColors, numAlphaValues, numK_bg);
+pi_bg = zeros(1, numK_bg);
+mu_bg = zeros(numColors, numK_bg);
+sigma_bg = zeros(numColors, numColors, numK_bg);
 
 % compute beta
 randomPixels = im_data_vectorized;
@@ -115,7 +119,8 @@ iter = 1;
 skipStep = true;
 scores = [];
 energies = [];
-while (iter<MAX_ITER)
+oldAlpha = -inf*ones(size(alpha));
+while (sum((alpha-oldAlpha).^2)/length(alpha) > CONVERGENCE_DISTANCE_THRESHOLD && iter < MAX_ITER)
 %    iter
     %figure;
     %imshow(reshape(alpha,im_height,im_width));
@@ -170,6 +175,7 @@ while (iter<MAX_ITER)
     if (~skipStep || startingStep==updateAlphaIdx)
         D_fg = computeD(im_data_vectorized, numK_fg, pi_fg, mu_fg, sigma_fg);
         D_bg = computeD(im_data_vectorized, numK_bg, pi_bg, mu_bg, sigma_bg);
+        oldAlpha = alpha;
         [alpha energy] = updateAlpha(im_data, bbox_vectorized, D_fg, D_bg, alpha, lambda, beta);
         energies = [energies, energy];
         score = computeScore(alpha, true_seg_data_vectorized);
@@ -191,7 +197,24 @@ while (iter<MAX_ITER)
     iter = iter+1;
 end
 figure;
-imshow(reshape(alpha,im_height,im_width));
+alphaMatrix = reshape(alpha,im_height,im_width);
+imshow(alphaMatrix);
+kMatrix_fg = reshape(k_fg,im_height,im_width);
+kMatrix_bg = reshape(k_bg,im_height,im_width);
+
+c_fg = sortComponentsByEnergy(im_data_vectorized, numK_fg, pi_fg, mu_fg, sigma_fg);
+c_top_fg = chooseTopComponentsByEnergy(energies, sortedComponents, threshold
+for i = 1:numK_fg
+    c = reshape((k_fg==c_fg(i)), im_height, im_width);
+    figure;
+    imshow((alphaMatrix==fg_val).*c);
+end
+c_bg = sortComponentsByEnergy(im_data_vectorized, numK_bg, pi_bg, mu_bg, sigma_bg);
+for i = 1:numK_bg
+    c = reshape((k_bg==c_bg(i)), im_height, im_width);
+    figure;
+    imshow((alphaMatrix==bg_val).*c);
+end
 
 figure;
 plot(1:iter-1, energies);
@@ -306,4 +329,25 @@ im_file_name = [im_file_name '.txt'];
 fid = fopen([bbox_dir '/' im_file_name]);
 bbox = fscanf(fid, '%g', [1 inf]);
 fclose(fid);
+end
+
+function [energies sortedComponents] = sortComponentsByEnergy(im_data_vectorized, numK_fg, pi_fg, mu_fg, sigma_fg)
+D = computeD(im_data_vectorized, numK_fg, pi_fg, mu_fg, sigma_fg);
+Davg = mean(D, 2);
+[energies, sortedComponents] = sort(Davg);
+end
+
+function [components] = chooseTopComponentsByEnergy(energies, sortedComponents, threshold)
+cumEnergy = cumsum(energies)/sum(totalEnergy);
+endIdx = 1;
+while (true)
+    if (endIdx+1 > length(energies))
+        break;
+    end
+    if (cumEnergy(endIdx+1) > threshold)
+        break;
+    end
+    endIdx = endIdx+1;
+end
+components = sortedComponents(1:endIdx);
 end

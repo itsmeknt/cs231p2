@@ -96,44 +96,19 @@ end
 % computeDinComputeAlpha_time = toc(start)
 % end
 
-function D = computeD(im_data_vectorized, alpha, pi, mu, sigma)       % D is [k x numpixels]
-    initGlobalVariables;
-    numPixels = length(alpha);
-    D=zeros(numAlphaValues,numPixels);
-    % cache computations
-    term1cache = -log(pi);      % 2 x K
-
-    for a = 1:numAlphaValues
-        dummy = zeros(K, numPixels);
-        for c = 1:K    
-            term1 = term1cache(a,c);    % 1 x pixel
-            term2 = 0.5*log(det(sigma(:,:,a, c)));      % 1 x pixel
-
-            firstMoment = bsxfun(@minus,im_data_vectorized,mu(:,a,c));     % 3 x pixel
-            sigmaInv = pinv(sigma(:,:,a,c));
-            term3Half = (firstMoment'*sigmaInv)';       % 3 x pixel
-            term3 = 0.5*sum(term3Half .* firstMoment);
-            dummy(c, :) = term1+term2+term3;
-        end
-        D(a,:)=min(dummy);
-    end
-end
-
 % function V=getV(im_data,alpha,beta,gamma)
 % 
 % 
 % end
 
 function V = computeV(im_data, alpha, beta, gamma)       % V is [numV x numpixels x 2]
-start = tic;
 initGlobalVariables;
-V = zeros(Vdim, size(im_data,1)*size(im_data,2), 2);
-for i = 1:length(Voffsets)
+V = zeros(size(Voffsets,1), size(im_data,1)*size(im_data,2), 2);
+for i = 1:size(Voffsets,1)
     offset = Voffsets(i, :);
     V(i,:,:) = computeVrow(im_data, alpha, beta, gamma, offset);
 end
 
-computeV = toc(start);
 end
 
 function Vrow = computeVrow(im_data, alpha, beta, gamma, offset)
@@ -149,8 +124,8 @@ im_idx_offset = offsetMatrix(im_idx, offset, -1);                   % pixels out
 diff = im_data - im_data_offset;
 dist = sum(diff.*diff, 3);
 
-weight = sqrt(sum(offset.*offset));
-weightedExpDist = weight*gamma*exp(-beta*dist);
+weight = 1; % sqrt(sum(offset.*offset));
+weightedExpDist = weight*gamma*exp(-1*beta*dist);
 
 alphaDiffIdx = alphaMatrix ~= alphaMatrixOffset;
 Vmatrix = alphaDiffIdx.*weightedExpDist;
@@ -174,6 +149,21 @@ elseif offset(1) >= 0 && offset(2) < 0
     matrixOffset(offset_y_dist+1:end, 1:end-offset_x_dist, :) = matrix(1:end-offset_y_dist, offset_x_dist+1:end, :);
 elseif offset(1) < 0 && offset(2) < 0
     matrixOffset(1:end-offset_y_dist, 1:end-offset_x_dist, :) = matrix(offset_y_dist+1:end, offset_x_dist+1:end, :);
+end
+end
+
+function matrix = stripOffset(matrixOffset, offset)
+offset_y_dist = abs(offset(1));
+offset_x_dist = abs(offset(2));
+
+if offset(1) >=0 && offset(2) >= 0
+    matrix = matrixOffset(1+offset_y_dist:end, 1+offset_x_dist:end);
+elseif offset(1) < 0 && offset(2) >= 0
+    matrix = matrixOffset(1:end-offset_y_dist, 1+offset_x_dist:end);
+elseif offset(1) >= 0 && offset(2) < 0
+    matrix = matrixOffset(1+offset_y_dist:end, 1:end-offset_x_dist);
+elseif offset(1) < 0 && offset(2) < 0
+    matrix = matrixOffset(1:end-offset_y_dist, 1:end-offset_x_dist);
 end
 end
 

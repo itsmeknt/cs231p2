@@ -14,9 +14,10 @@ stone2 - 0.9894
 flower - 0.9855
 fullmoon - 0.9826
 cross - 0.7202
-banana1 - 0.6933 -- different random seeds: 0.9425, 0.7865, 0.6808, 0.6840, 0.7465, 0.6999
+banana1 - 0.6933
 
 8-2 smoothing
+
 sheep - 0.9941
 stone2 - 0.9891
 flower - 0.9879

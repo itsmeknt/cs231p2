@@ -1,7 +1,7 @@
-function [k] = updateK(im_data_vectorized, alpha, alphaVal, bbox_vectorized, numK, pi, mu, sigma, init )
+function [k] = updateK(im_data_vectorized, alpha, alphaVal, bbox_vectorized, numK, pi, mu, sigma, init, rng_seed )
 % disp('step 1: finding k');
 if init
-    k = initK(im_data_vectorized, alphaVal, bbox_vectorized, numK);
+    k = initK(im_data_vectorized, alphaVal, bbox_vectorized, numK, rng_seed);
 else
     D = computeD(im_data_vectorized, numK, pi, mu, sigma);
     [~, kUpdated] = min(D);
@@ -10,9 +10,9 @@ end
 % disp('step 1 done!');
 end
 
-function k = initK(im_data_vectorized, alphaVal, bbox_vectorized, numK)       % D is [k x numpixels]
+function k = initK(im_data_vectorized, alphaVal, bbox_vectorized, numK, rng_seed)       % D is [k x numpixels]
 initGlobalVariables;
-rng(RAND_SEED);
+rng(rng_seed);
 k = randi(numK, [1 size(im_data_vectorized, 2)]);
 
 %{

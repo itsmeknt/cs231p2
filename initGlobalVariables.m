@@ -15,7 +15,6 @@ updateAlphaIdx = 3;
 numK_fg = 5;
 numK_bg = 5;
 numAlphaValues = 2;
-numColors = 3;
 fg_idx = 1;
 bg_idx = 2;
 fg_val = 1;
@@ -26,23 +25,19 @@ b_idx = 3;
 
 lambda = 50; % author stated 50 was best
 
-MAX_ITER = 15;
-CONVERGENCE_DISTANCE_THRESHOLD = 0.1;
-RAND_SEED = 0;
+MAX_ITER = 30;
+CONVERGENCE_DISTANCE_THRESHOLD = 0.001;
 
 random_pixel_image_max_size = 30000;
 % type 1 - neighboring 4
 % type 2 - neighboring 8
-Vtype = 1;
-Voffsets = [];
-Vdim = 0;
-if Vtype == 1
-    Vdim = 4;
-     Voffsets = [];
-    %Voffsets = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1];
-    %Voffsets = [1, 0; 2, 0; 3,0; 4,0; 0,1; 0,2; 0,3; 0,4; -1,0; -2,0; -3,0; -4,0; 0,-1; 0,-2; 0,-3; 0,-4];
-    % Voffsets = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 2,0;2,2;0,2;-2,2;-2,0;-2,-2;0,-2;2,-2];
-   % Voffsets = [1, 0; 0, 1; -1, 0; 0, -1];
+Vtype = '8pixel';
+if strcmp(Vtype, 'none') == 0
+    Voffsets = [];
+elseif strcmp(Vtype, '8pixel')
+    Voffsets = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1];
+elseif strcmp(Vtype, '16pixel')
+    Voffsets = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 2,0;2,2;0,2;-2,2;-2,0;-2,-2;0,-2;2,-2];
 end
 
 epsilon = 10^-100;
