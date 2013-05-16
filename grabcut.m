@@ -9,51 +9,58 @@ if (~isempty(periodIdx))
     seg_name = [im_name(1:periodIdx(end)) 'bmp'];
 end
 
+[im_height, im_width, channel_num] = size(im_data);
 true_seg_data = double(imread([seg_dir '/' seg_name]))/255;
 true_seg_data_vectorized = true_seg_data(:)';
 assert(sum(true_seg_data_vectorized == 1) > 0);
 % display the image
 imagesc(im_data);
 
-%{
-% a bounding box initialization
-disp('Draw a bounding box to specify the rough location of the foreground');
+bbox_type = 'select';
 
-%
-set(gca,'Units','pixels');
-ginput(1);
-p1=get(gca,'CurrentPoint');fr=rbbox;p2=get(gca,'CurrentPoint');
-p=round([p1;p2]);
-xmin=min(p(:,1));xmax=max(p(:,1));
-ymin=min(p(:,2));ymax=max(p(:,2));
-%
- 
-%{
- xmin = 10;
- xmax = 412;
- ymin = 10;
- ymax = 412;
-%}
-
-xmin = max(xmin, 1);
-xmax = min(im_width, xmax);
-ymin = max(ymin, 1);
-ymax = min(im_height, ymax);
-
-bbox = [xmin ymin xmax ymax];
+if (strcmp(bbox_type, 'select'))
+    disp('Draw a bounding box to specify the rough location of the foreground');
+    
+    set(gca,'Units','pixels');
+    ginput(1);
+    p1=get(gca,'CurrentPoint');fr=rbbox;p2=get(gca,'CurrentPoint');
+    p=round([p1;p2]);
+    xmin=min(p(:,1));xmax=max(p(:,1));
+    ymin=min(p(:,2));ymax=max(p(:,2));
+    
+    xmin = max(xmin, 1);
+    xmax = min(im_width, xmax);
+    ymin = max(ymin, 1);
+    ymax = min(im_height, ymax);
+    
+    bbox = [xmin ymin xmax ymax];
+elseif (strcmp(bbox_type, 'true'))
+    bbox = getBbox(im_name);
+    xmin = bbox(1);
+    ymin = bbox(2);
+    xmax = bbox(3);
+    ymax = bbox(4);
+elseif (strcmp(bbox_type, 'all'))
+    xmin = 1;
+    xmax = im_width;
+    ymin = 1;
+    ymax = im_height;
+    bbox = [xmin, ymin, xmax, ymax];
+end
 
 if channel_num ~= 3
     disp('This image does not have all the RGB channels, you do not need to work on it.');
     return;
 end
-%}
+%
+% end
 
-[im_height, im_width, channel_num] = size(im_data);
-bbox = getBbox(im_name);
-xmin = bbox(1);
-ymin = bbox(2);
-xmax = bbox(3);
-ymax = bbox(4);
+% use given bbox
+% start
+%
+%
+% end
+
 line(bbox([1 3 3 1 1]),bbox([2 2 4 4 2]),'Color',[1 0 0],'LineWidth',1);
 
 
@@ -84,13 +91,16 @@ alpha = reshape(alpha, im_height*im_width, 1)';
 
 
 % init k, GMM params to 0
-k = zeros(1, length(alpha));
-pi = zeros(numAlphaValues, K);
-mu = zeros(numColors, numAlphaValues, K);
-sigma = zeros(numColors, numColors, numAlphaValues, K);
-oldPi = pi;
-oldMu = mu;
-oldSigma = sigma;
+k_fg = zeros(1, length(alpha));
+k_bg = zeros(1, length(alpha));
+
+pi_fg = zeros(numAlphaValues, numK_fg);
+mu_fg = zeros(numColors, numAlphaValues, numK_fg);
+sigma_fg = zeros(numColors, numColors, numAlphaValues, numK_fg);
+
+pi_bg = zeros(numAlphaValues, numK_bg);
+mu_bg = zeros(numColors, numAlphaValues, numK_bg);
+sigma_bg = zeros(numColors, numColors, numAlphaValues, numK_bg);
 
 % compute beta
 randomPixels = im_data_vectorized;
@@ -110,12 +120,13 @@ scores = [];
 energies = [];
 while (iter<MAX_ITER)
 %    iter
-    figure;
-    imshow(reshape(alpha,im_height,im_width));
+    %figure;
+    %imshow(reshape(alpha,im_height,im_width));
     
     % step 1
     if (~skipStep || startingStep==updateKidx)
-        k = updateK(im_data_vectorized, alpha, bbox_vectorized, pi, mu, sigma, startingStep==updateKidx && iter == 1);
+        [k_fg] = updateK(im_data_vectorized, alpha, fg_val, bbox_vectorized, numK_fg, pi_fg, mu_fg, sigma_fg, startingStep==updateKidx && iter == 1);
+        [k_bg] = updateK(im_data_vectorized, alpha, bg_val, bbox_vectorized, numK_bg, pi_bg, mu_bg, sigma_bg, startingStep==updateKidx && iter == 1);
         if (startingStep == updateKidx)
             skipStep = false;
         end
@@ -131,10 +142,8 @@ while (iter<MAX_ITER)
     
     % step 2
     if (~skipStep || startingStep==updateGMMidx)
-        oldPi = pi;
-        oldMu = mu;
-        oldSigma = sigma;
-        [pi mu sigma] = updateGMM(im_data_vectorized, alpha, k, startingStep==updateGMMidx && iter == 1);
+        [pi_fg mu_fg sigma_fg] = updateGMM(im_data_vectorized, alpha, fg_val, k_fg, numK_fg, startingStep==updateGMMidx && iter == 1);
+        [pi_bg mu_bg sigma_bg] = updateGMM(im_data_vectorized, alpha, bg_val, k_bg, numK_bg, startingStep==updateGMMidx && iter == 1);
         
         %{
         if (iter > 1 && hasConverged(pi, mu, sigma, oldPi, oldMu, oldSigma))
@@ -162,7 +171,9 @@ while (iter<MAX_ITER)
     
     % step 3
     if (~skipStep || startingStep==updateAlphaIdx)
-        [alpha energy] = updateAlpha(im_data, im_data_vectorized, k, alpha, pi, mu, sigma, lambda, beta, startingStep==updateAlphaIdx && iter == 1, iter, bbox_vectorized);
+        D_fg = computeD(im_data_vectorized, numK_fg, pi_fg, mu_fg, sigma_fg);
+        D_bg = computeD(im_data_vectorized, numK_bg, pi_bg, mu_bg, sigma_bg);
+        [alpha energy] = updateAlpha(im_data, bbox_vectorized, D_fg, D_bg, alpha, lambda, beta);
         energies = [energies, energy];
         score = computeScore(alpha, true_seg_data_vectorized);
         scores = [scores, score];
@@ -182,7 +193,6 @@ while (iter<MAX_ITER)
     skipStep = false;
     iter = iter+1;
 end
-
 figure;
 imshow(reshape(alpha,im_height,im_width));
 
@@ -199,12 +209,16 @@ end
 
 function score = computeScore(alpha, true_seg_data_vectorized)
 initGlobalVariables;
+%{
 alpha_bg = alpha==bg_val;
 alpha_fg = alpha==fg_val;
-true_bg = true_seg_data_vectorized==0;
-true_fg = true_seg_data_vectorized.*(true_seg_data_vectorized>0);
-totalScore = sum(alpha_bg.*true_bg + alpha_fg.*true_fg);
+true_bg = true_seg_data_vectorized==bg_val;
+true_fg = true_seg_data_vectorized==fg_val;
+true_ambig = true_seg_data_vectorized > 0.3 & true_seg_data_vectorized < 0.7;
+totalScore = sum(alpha_bg.*true_bg + alpha_fg.*true_fg + alpha_fg.*true_ambig);
 score = totalScore/length(alpha);
+%}
+score = sum(alpha == true_seg_data_vectorized)/length(true_seg_data_vectorized);
 end
 
 function randomPixels = randomPixelSample(im_data_vectorized, n)

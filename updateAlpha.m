@@ -1,7 +1,6 @@
-function [alpha energy] = updateAlpha(im_data, im_data_vectorized, k, alpha, pi, mu, sigma, gamma, beta, init, iter, bbox_vectorized)
+function [alpha energy] = updateAlpha(im_data, bbox_vectorized, D_fg, D_bg, alpha, beta, gamma)
 initGlobalVariables;
 % disp('step 3: finding alpha');
-D = computeD(im_data_vectorized, alpha, pi, mu, sigma);
 % Dsliced = D(fg_idx,:).*(alpha==fg_val) + D(bg_idx,:).*(alpha==bg_val);
 %tU = find(bbox_vectorized==1);
 %D = D(:,tU);
@@ -11,7 +10,18 @@ D = computeD(im_data_vectorized, alpha, pi, mu, sigma);
 % D(1,:)=D(1,:).*alpha_fg_idx;
 % D(2,:)=D(2,:).*alpha_bg_idx;
 
-V = computeV(im_data, alpha, beta, gamma, iter);
+D_fg_vector = D_fg;
+if (size(D_fg, 1) > 1)
+    D_fg_vector = min(D_fg);
+end
+
+D_bg_vector = D_bg;
+if (size(D_bg, 1) > 1)
+    D_bg_vector = min(D_bg);
+end
+
+D = [D_fg_vector; D_bg_vector];
+V = computeV(im_data, alpha, beta, gamma);
 
 %w = size(im_data,2);
 %h = size(im_data,1);
@@ -114,7 +124,7 @@ end
 % 
 % end
 
-function V = computeV(im_data, alpha, beta, gamma, iter)       % V is [numV x numpixels x 2]
+function V = computeV(im_data, alpha, beta, gamma)       % V is [numV x numpixels x 2]
 start = tic;
 initGlobalVariables;
 V = zeros(Vdim, size(im_data,1)*size(im_data,2), 2);

@@ -12,7 +12,8 @@ updateGMMidx = 2;
 updateAlphaIdx = 3;
 
 % init variables
-K = 5;
+numK_fg = 5;
+numK_bg = 5;
 numAlphaValues = 2;
 numColors = 3;
 fg_idx = 1;
@@ -45,6 +46,7 @@ if Vtype == 1
 end
 
 epsilon = 10^-100;
+delta = 10^-6;
 
 %{
 ng kmeans

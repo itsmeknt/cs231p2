@@ -1,0 +1,32 @@
+function [D_fg D_bg] = computeD(im_data_vectorized, pi_fg, pi_bg, mu_fg, mu_bg, sigma_fg, sigma_bg)       % D_fg and D_bg is [2 x numpixels]
+initGlobalVariables;
+
+D_fg = computeDpart(im_dat
+
+end
+
+function [D_part] = computeDpart(im_data_vectorized, numK, pi, mu, sigma)               % D_part is [k x numPixels
+D_part = zeros(numK, size(im_data_vectorized,2));
+for c = 1:numK
+    term1 = computeTerm1(pi_fg, c);
+    term2 = computeTerm2(sigma_fg, c);
+    term3 = computeTerm3(im_data_vectorized, mu_fg, sigma_fg, c);
+    
+    D_part(c, :) = term1+term2+term3;
+end
+end
+
+function term1 = computeTerm1(pi, c)            % 1 x 1
+term1 = -log(pi(c));
+end
+
+function term2 = computeTerm2(sigma, c)         % 1 x 1
+term2 = 0.5*log(det(sigma(:,:,c)));
+end
+
+function term3 = computeTerm3(im_data_vectorized, mu, sigma, c)         % 1 x pixel
+firstMoment = bsxfun(@minus, im_data_vectorized, mu(:,c));
+sigmaInv = pinv(sigma(:,:,c));
+term3half = (firstMoment'*sigmaInv)';
+term3 = 0.5*sum(term3half .* firstMoment);
+end
