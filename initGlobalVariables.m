@@ -39,7 +39,7 @@ elseif strcmp(Vtype, '8pixel')
 elseif strcmp(Vtype, '16pixel')
     Voffsets = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 2,0;2,2;0,2;-2,2;-2,0;-2,-2;0,-2;2,-2];
 end
-
+initType = 'random';
 epsilon = 10^-100;
 delta = 10^-6;
 

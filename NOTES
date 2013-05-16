@@ -16,6 +16,15 @@ fullmoon - 0.9826
 cross - 0.7202
 banana1 - 0.6933 -- different random seeds: 0.9425, 0.7865, 0.6808, 0.6840, 0.7465, 0.6999
 
+8-1 smoothing w 4 random samples
+
+sheep - 0.9949
+stone2 - 0.9881
+fullmoon - 0.9869
+flower - 0.9698
+cross - 0.7259
+banana1 - 0.9397
+
 8-2 smoothing
 sheep - 0.9941
 stone2 - 0.9891

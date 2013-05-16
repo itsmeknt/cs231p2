@@ -29,13 +29,13 @@ for i = 1:numK
     end
     
     % compute sigma
-    %if numPixel_alpha_k <= 1
-    %    sigma(:, :, i) = eye(numColors)*delta;
-    %else
+    if numPixel_alpha_k <= 1
+        sigma(:, :, i) = eye(numColors)*delta;
+    else
         first_central_moment_full = bsxfun(@minus, im_data_vectorized, mu(:, i));
         first_central_moment = first_central_moment_full(:, idx_alpha_k);
         sigma(:, :, i) =  (first_central_moment * first_central_moment')/(numPixel_alpha_k-1) + eye(numColors)*delta;
-    %end
+    end
 end
 % disp('step 2 done!');
 
