@@ -851,107 +851,147 @@ template <typename captype, typename tcaptype, typename flowtype>
 // Start own function
 #include <matrix.h>
 #include <mex.h>   
+#include <math.h>
+
+double getWeight(double px1r,double px1g,double px1b,double px2r,double px2g,double px2b,double beta,double gamma,int palpha,int nalpha)
+{
+    if (palpha==nalpha) return 0;
+    else {
+        double norm=(px1r-px2r)*(px1r-px2r)+(px1g-px2g)*(px1g-px2g)+(px1b-px2b)*(px1b-px2b);
+        return gamma*exp(-beta*norm);
+    }
+}
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
 
-	//printf("1\n");
-//declare variables
-    mxArray *D, *PairW, *tU, *kIn, *alpha;
-    const mwSize *dimsPairW, *dimsD;
-    double *alphaPtr, *DPtr, *PairWPtr, *tUPtr, *kInPtr;
-    int dimxPairW, dimyPairW, dimzPairW, dimxD, dimyD;
+	printf("1\n");
+    //declare variables
+    mxArray *D, *alphaIn, *beta, *gamma, *imData, *alpha;
+    const mwSize *dimsData;
+    double *DPtr, *alphaInPtr, *betaPtr, *gammaPtr, *imDataPtr, *alphaPtr;
+    int dimxData, dimyData;
     int i,j;
 
-//associate inputs
+    //associate inputs
    
-	//printf("2\n");
+	printf("2\n");
     D = mxDuplicateArray(prhs[0]);
-    PairW = mxDuplicateArray(prhs[1]);
-    //tU = mxDuplicateArray(prhs[2]);
-    //kIn = mxDuplicateArray(prhs[3]);
-//figure out dimensions
+    alphaIn = mxDuplicateArray(prhs[1]);
+    beta = mxDuplicateArray(prhs[2]);
+    gamma = mxDuplicateArray(prhs[3]);
+    imData = mxDuplicateArray(prhs[4]);
     
-	//printf("3\n");
-    dimsPairW = mxGetDimensions(prhs[1]);
-    dimyPairW = (int)dimsPairW[0]; dimxPairW = (int)dimsPairW[1]; dimzPairW = (int)dimsPairW[2];
-    dimsD = mxGetDimensions(prhs[0]);
-    dimyD = (int)dimsD[0]; dimxD = (int)dimsD[1];
+    //figure out dimensions
+	printf("3\n");
+    dimsData = mxGetDimensions(prhs[4]);
+    dimyData = (int)dimsData[0]; dimxData = (int)dimsData[1];
     
 
-	//printf("4\n");
-//associate outputs
-    alpha = plhs[0] = mxCreateDoubleMatrix(1,dimxPairW,mxREAL);
+	printf("4\n");
+    //associate outputs
+    alpha = plhs[0] = mxCreateDoubleMatrix(1,dimxData*dimyData,mxREAL);
     
-	//printf("5\n");
-//associate pointers
+	
+    //associate pointers
     alphaPtr = mxGetPr(alpha);
     DPtr = mxGetPr(D);
-    PairWPtr = mxGetPr(PairW);
-    //tUPtr = mxGetPr(tU);
-    //kInPtr = mxGetPr(kIn);
-	//printf("6\n");
+    alphaInPtr = mxGetPr(alphaIn);
+    betaPtr = mxGetPr(beta);
+    gammaPtr = mxGetPr(gamma);
+    imDataPtr = mxGetPr(imData);
+    
+    double GammaVal=gammaPtr[0];
+    double BetaVal=betaPtr[0];
+    
+	
     typedef Graph<double,double,double> GraphType;
-	int numNodes=dimxPairW;
+	int numNodes=dimxData*dimyData;
 	GraphType *g = new GraphType(/*estimated # of nodes*/ numNodes, /*estimated # of edges*/ numNodes*6); 
 	g->add_node(numNodes);
+    
+    double pR,pG,pB,nR,nG,nB;
+    double weight;
+    int n1,n2,n3,n4,palpha,nalpha;
     // loop through pixels
-    
-    /*
-        for(i=0;i<dimxPairW;i++)
+    for (i=0;i<dimxData;i++)
     {
-            //mexPrintf("D[0][%d] = %f\n",i,DPtr[i*2]);
-            //mexPrintf("D[1][%d] = %f\n",i,DPtr[i*2+1]);
-        for(j=0;j<dimyPairW;j++)
+        
+        for (j=0;j<dimyData;j++)
         {
-            int xy = j+i*dimyPairW;
-            int matSize = dimxPairW*dimyPairW;
-            
-            //mexPrintf("V[%d][%d][0] = %f\n",j,i,PairWPtr[xy]);
-            mexPrintf("V[%d][%d][1] = %f\n",j,i,PairWPtr[matSize + xy - 1]);
-        }
-    }
-    */
-    
-    for (i=0;i<dimxPairW;i++)
-    {
-
-        //if (i % 10000 == 0)
-	//printf("7: %d/%d\n", i, dimxPairW);
-        //if (((int)tUPtr[i])==1) {
-            //printf("7: %d/%d\n", i, dimxPairW);
-            g->add_tweights(i,DPtr[2*i+1],DPtr[2*i]);
-        //}
-        /*else {
-            //printf("7: %d/%d\n", i, dimxPairW);
-            g->add_tweights(i,0,kInPtr[0]);
-        }*/
-        for (j=0;j<dimyPairW;j++)
-        {
-            int xy = j+i*dimyPairW;
-            int matSize = dimxPairW*dimyPairW;
-            
-	// printf("8: %d/%d\n", j, dimyPairW);
-            if ((int)PairWPtr[matSize + xy]-1<0) {
-	//printf("8-2\n");
-        continue;
+            int xy = j+i*dimyData; // current pixel pointer index
+            //printf("5\n");
+            g->add_tweights(xy,DPtr[xy+numNodes],DPtr[xy]);
+            pR=imDataPtr[xy];
+            pG=imDataPtr[xy+numNodes];
+            pB=imDataPtr[xy+2*numNodes];
+            if (xy==1155) {
+                printf("RGB = (%f,%f,%f)\n",pR,pG,pB);
+                break;
             }
-            else {
-	// printf("8-3: i=%d, j=%d, dimyPairW=%d, dimxPairW=%d, dimzPairW=%d, dimxD=%d, dimyD=%d, matSize=%d, xy=%d ---- ", i, j, dimyPairW, dimxPairW, dimzPairW, dimxD, dimyD, matSize, xy);
-	// printf("8-3-2: PairWPtr1=%d, PairWPtr2=%f\n", (int)PairWPtr[matSize + xy]-1, PairWPtr[xy]);
-    g->add_edge(i,(int)PairWPtr[matSize + xy]-1,PairWPtr[xy],PairWPtr[xy]);
+            palpha=(int)alphaInPtr[xy];
+            printf("6: %d,%d,%d\n", i,j,xy);
+            if (i<dimxData-1) {
+                printf("61\n");
+                n1=xy+dimyData;
+                nR=imDataPtr[n1];
+                nG=imDataPtr[n1+numNodes];
+                nB=imDataPtr[n1+2*numNodes];
+                nalpha=(int)alphaInPtr[n1];
+                weight=getWeight(pR,pG,pB,nR,nG,nB,BetaVal,GammaVal,palpha,nalpha);
+                g->add_edge(xy,n1,weight,weight);
+            }
+            
+            if (j<dimyData-1) {
+                printf("62\n");
+                n2=xy+1;
+                nR=imDataPtr[n2];
+                nG=imDataPtr[n2+numNodes];
+                nB=imDataPtr[n2+2*numNodes];
+                nalpha=(int)alphaInPtr[n2];
+                weight=getWeight(pR,pG,pB,nR,nG,nB,BetaVal,GammaVal,palpha,nalpha);
+                g->add_edge(xy,n2,weight,weight);
+            }
+            
+            if (j>0) {
+                printf("63\n");
+                n3=xy-1;
+                nR=imDataPtr[n3];
+                nG=imDataPtr[n3+numNodes];
+                nB=imDataPtr[n3+2*numNodes];
+                nalpha=(int)alphaInPtr[n3];
+                weight=getWeight(pR,pG,pB,nR,nG,nB,BetaVal,GammaVal,palpha,nalpha);
+                g->add_edge(xy,n3,weight,weight);
+            }
+            
+            if (i>0) {
+                printf("64\n");
+                n4=xy-dimyData;
+                nR=imDataPtr[n4];
+                nG=imDataPtr[n4+numNodes];
+                nB=imDataPtr[n4+2*numNodes];
+                nalpha=(int)alphaInPtr[n4];
+                weight=getWeight(pR,pG,pB,nR,nG,nB,BetaVal,GammaVal,palpha,nalpha);
+                g->add_edge(xy,n4,weight,weight);
             }
         }
+        if (xy==1155) {
+                break;
+            }
     }
+                
+    printf("9\n");          
     double flow = g->maxflow();
 	printf("Flow = %f\n", flow);
-	//printf("9\n");
-    for (i=0;i<dimxPairW;i++)
+	
+    for (i=0;i<numNodes;i++)
 	{
-	//printf("10: %d/%d\n", i, dimxPairW);
+	printf("10: %d/%d\n", i, numNodes);
 		if (g->what_segment(i) == GraphType::SOURCE) alphaPtr[i]=1;
-		else alphaPtr[i]=0;
+		else alphaPtr[i]=0; 
     }
 	delete g;
     return;
 }
+        
+        

@@ -1,5 +1,5 @@
 function [pi mu sigma] = updateGMM(im_data_vectorized, alpha, k, init)
-disp('step 2: finding theta');
+% disp('step 2: finding theta');
 initGlobalVariables;
 pi = zeros(numAlphaValues, K);                              % pi is [2 x k]
 mu = zeros(numColors, numAlphaValues, K);                   % mu is [3 x 2 x k]
@@ -30,29 +30,32 @@ for i = 1:K
     
     if numPixelFg_i == 0
         mu(:, fg_idx, i) = zeros(numColors, 1, 1);
-        sigma(:, :, fg_idx, i) = eye(numColors)*epsilon;
     else
         mu(:, fg_idx, i) = mean(im_data_fg_i,2);
-        
+    end
+    if numPixelFg_i <= 1
+        sigma(:, :, fg_idx, i) = eye(numColors)*epsilon;
+    else
         temp_fg_sigma_vector = bsxfun(@minus, im_data_fg_i, mu(:, fg_idx, i));
-        sigma(:, :, fg_idx, i) =  temp_fg_sigma_vector * temp_fg_sigma_vector';
+        sigma(:, :, fg_idx, i) =  (temp_fg_sigma_vector * temp_fg_sigma_vector')/(numPixelFg_i-1) + eye(numColors)*epsilon;
     end
     
     if numPixelBg_i == 0
         mu(:, bg_idx, i) = zeros(numColors, 1, 1);
-        sigma(:, :, bg_idx, i) = eye(numColors)*epsilon;
     else
         mu(:, bg_idx, i) = mean(im_data_bg_i,2);
-        
+    end
+    if numPixelBg_i <= 1
+        sigma(:, :, bg_idx, i) = eye(numColors)*epsilon;
+    else
         temp_bg_sigma_vector = bsxfun(@minus, im_data_bg_i, mu(:, bg_idx, i));
-        sigma(:, :, bg_idx, i) = temp_bg_sigma_vector * temp_bg_sigma_vector';
+        sigma(:, :, bg_idx, i) = (temp_bg_sigma_vector * temp_bg_sigma_vector')/(numPixelBg_i-1) + eye(numColors)*epsilon;
     end
     
     
     
-    
 end
-disp('step 2 done!');
+% disp('step 2 done!');
 
 
 end

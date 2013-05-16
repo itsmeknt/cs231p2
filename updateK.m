@@ -1,5 +1,5 @@
 function [k] = updateK(im_data_vectorized, alpha, bbox_vectorized, pi, mu, sigma, init )
-disp('step 1: finding k');
+% disp('step 1: finding k');
 if init
     k = initK(im_data_vectorized, alpha, bbox_vectorized);
 else
@@ -7,7 +7,7 @@ else
     [~, kUpdated] = min(D);
     k = kUpdated;
 end
-disp('step 1 done!');
+% disp('step 1 done!');
 end
 
 
@@ -42,22 +42,28 @@ for c = 1:K
     term3 =  term3fg.*alpha_fg_idx + term3bg.*alpha_bg_idx;                               % 1 x pixel
     D(c, :) = term1+term2+term3;
 end
-computeDinComputeK_time = toc(start)
+computeDinComputeK_time = toc(start);
 end
 
 
 
 function k = initK(im_data_vectorized, alpha, bbox_vectorized)       % D is [k x numpixels]
 initGlobalVariables;
+rng(RAND_SEED);
+k = randi(K, [1 length(alpha)]);
+
+%{
 k = zeros(1, size(im_data_vectorized,2));
-if (allowCache)
-    try
-        load([kCacheFile]);
-        return
-    catch
-    end
-end
-disp('initializing k using kmeans');
+
+%if (allowCache)
+%    try
+%        load([kCacheFile]);
+%        return
+%    catch
+%    end
+%end
+
+% disp('initializing k using kmeans');
 [kFg, ~] = kMeans(im_data_vectorized(:,bbox_vectorized==1)', K);                                   % k is [1 x numpixel]
 [kBg, ~] = kMeans(im_data_vectorized(:,bbox_vectorized==0)', K);                                   % k is [1 x numpixel]
 k = zeros(1, length(alpha));
@@ -72,5 +78,6 @@ for i=1:length(alpha)
         bgIdx = bgIdx+1;
     end
 end
-save(kCacheFile, 'k');
+% save(kCacheFile, 'k');
+%}
 end

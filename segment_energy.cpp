@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "graph.h"
+#include "energy.h"
+#include <vector>
 
 
 template <typename captype, typename tcaptype, typename flowtype> 
@@ -868,8 +870,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	//printf("2\n");
     D = mxDuplicateArray(prhs[0]);
     PairW = mxDuplicateArray(prhs[1]);
-    //tU = mxDuplicateArray(prhs[2]);
-    //kIn = mxDuplicateArray(prhs[3]);
+    tU = mxDuplicateArray(prhs[2]);
+    kIn = mxDuplicateArray(prhs[3]);
 //figure out dimensions
     
 	//printf("3\n");
@@ -888,11 +890,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     alphaPtr = mxGetPr(alpha);
     DPtr = mxGetPr(D);
     PairWPtr = mxGetPr(PairW);
-    //tUPtr = mxGetPr(tU);
-    //kInPtr = mxGetPr(kIn);
+    tUPtr = mxGetPr(tU);
+    kInPtr = mxGetPr(kIn);
 	//printf("6\n");
     typedef Graph<double,double,double> GraphType;
 	int numNodes=dimxPairW;
+    
+    typedef Energy<float,float,float> EnergyType;
+    std::vector<EnergyType::Var> vars(numNodes);
+    EnergyType *e=new Energy();
 	GraphType *g = new GraphType(/*estimated # of nodes*/ numNodes, /*estimated # of edges*/ numNodes*6); 
 	g->add_node(numNodes);
     // loop through pixels
@@ -918,21 +924,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         //if (i % 10000 == 0)
 	//printf("7: %d/%d\n", i, dimxPairW);
-        //if (((int)tUPtr[i])==1) {
+        if (((int)tUPtr[i])==1) {
             //printf("7: %d/%d\n", i, dimxPairW);
             g->add_tweights(i,DPtr[2*i+1],DPtr[2*i]);
-        //}
-        /*else {
+        }
+        else {
             //printf("7: %d/%d\n", i, dimxPairW);
             g->add_tweights(i,0,kInPtr[0]);
-        }*/
+        }
         for (j=0;j<dimyPairW;j++)
         {
             int xy = j+i*dimyPairW;
             int matSize = dimxPairW*dimyPairW;
             
 	// printf("8: %d/%d\n", j, dimyPairW);
-            if ((int)PairWPtr[matSize + xy]-1<0) {
+            if (PairWPtr[xy]==0) {
 	//printf("8-2\n");
         continue;
             }
@@ -950,7 +956,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	{
 	//printf("10: %d/%d\n", i, dimxPairW);
 		if (g->what_segment(i) == GraphType::SOURCE) alphaPtr[i]=1;
-		else alphaPtr[i]=0;
+		else alphaPtr[i]=0; 
     }
 	delete g;
     return;
